@@ -88,6 +88,47 @@ LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m --host http://loc
   - Will be enabled by default starting from version 3.4
 - For best results, resource-constrain OpenSearch to a handful of CPUs to observe performance characteristics
 
+## Generating Test Data
+
+To generate test data for performance testing, you can use the data generation scripts provided in the `data_generation/` directory. These scripts simulate realistic sample AWS log data for each log type:
+
+- **`vpc_flow_turbo.py`** - Generate simulated VPC Flow Logs
+- **`networkfirewall_turbo.py`** - Generate simulated AWS Network Firewall logs
+- **`cloudtrail_turbo.py`** - Generate simulated CloudTrail logs
+- **`waf_turbo.py`** - Generate simulated WAF logs
+
+Each script creates high-volume, realistic sample data that mimics real AWS log structures and patterns. You can ingest this generated data into your OpenSearch cluster for testing. For meaningful performance results, we recommend generating at least 100 GB of data per log type.
+
+### Required Configuration
+
+All data generation scripts require the following environment variables:
+
+```sh
+export OPENSEARCH_ENDPOINT=https://your-cluster.region.es.amazonaws.com
+export OPENSEARCH_USER=admin
+export OPENSEARCH_PASSWORD='your-password'
+export INDEX_NAME=my_index_name
+```
+
+**Environment Variables:**
+- `OPENSEARCH_ENDPOINT` - Your OpenSearch cluster endpoint URL
+- `OPENSEARCH_USER` - Username for authentication  
+- `OPENSEARCH_PASSWORD` - Password for authentication
+- `INDEX_NAME` - Target index name where data will be ingested
+
+### Example Usage
+
+```sh
+# Set environment variables
+export OPENSEARCH_ENDPOINT=https://search-my-cluster.us-west-2.es.amazonaws.com
+export OPENSEARCH_USER=admin
+export OPENSEARCH_PASSWORD='mySecurePassword123'
+export INDEX_NAME=vpc_flow_logs_test
+
+# Run the VPC Flow Logs generator
+python3 data_generation/vpc_flow_turbo.py
+```
+
 ## Connecting to a Secured OpenSearch Cluster
 
 To connect to an OpenSearch cluster with authentication (like AWS OpenSearch Service with Fine-Grained Access Control), use environment variables for credentials.
