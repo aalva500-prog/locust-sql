@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_networkfirewall__mview | WHERE isnotnull(`aws.networkfirewall.event.http.url`) | STATS count() as event_count by span(`aws.networkfirewall.event.timestamp`, 2d), `aws.networkfirewall.event.http.url` | RENAME `aws.networkfirewall.event.http.url` as `URL` | SORT - event_count | HEAD 10

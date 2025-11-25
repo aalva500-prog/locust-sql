@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_networkfirewall__mview | stats count() as Count by SPAN(`aws.networkfirewall.event.timestamp`, 2d), `aws.networkfirewall.event.dest_port` | eval `Destination Port` = CAST(`aws.networkfirewall.event.dest_port` AS STRING) | sort - Count | HEAD 10\

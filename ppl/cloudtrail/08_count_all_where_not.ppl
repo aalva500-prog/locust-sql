@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_aws_cloudtrail__001 | WHERE NOT (aws.cloudtrail.sourceIPAddress LIKE '%.amazon%.com%' OR aws.cloudtrail.sourceIPAddress LIKE 'AWS%') | STATS count() as Count by aws.cloudtrail.sourceIPAddress | SORT - Count | HEAD 10

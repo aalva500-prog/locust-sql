@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_aws_waf__mview | STATS count() as Count by span(@timestamp, 30d), aws.waf.action | rename aws.waf.action as Action | SORT - Count	| HEAD 5

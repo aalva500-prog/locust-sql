@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_vpc_flow_v1__live_mview | stats sum(`aws.vpc.packets`) as Packets by `aws.vpc.dstaddr` | sort - Packets | head 10

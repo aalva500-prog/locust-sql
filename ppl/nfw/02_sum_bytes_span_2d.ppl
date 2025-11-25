@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_networkfirewall__mview | stats sum(`aws.networkfirewall.event.netflow.bytes`) as sum_bytes by span(`aws.networkfirewall.event.timestamp`, 2d) as timestamp_span, `aws.networkfirewall.event.src_ip` | rename  `aws.networkfirewall.event.src_ip` as `Source IP` | sort - sum_bytes | head 10

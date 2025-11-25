@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_networkfirewall__mview | stats sum(`aws.networkfirewall.event.netflow.pkts`) as packet_count by span(`aws.networkfirewall.event.timestamp`, 2d) as timestamp_span, `aws.networkfirewall.event.dest_ip` | rename `aws.networkfirewall.event.dest_ip` as `Destination IP` | sort - packet_count | head 10

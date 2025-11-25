@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_amazon_networkfirewall__mview | STATS count() as Count by `aws.networkfirewall.event.proto` | SORT - Count | HEAD 10

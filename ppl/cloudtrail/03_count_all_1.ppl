@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_aws_cloudtrail__001 | stats count() as Count by `aws.cloudtrail.userIdentity.accountId` | eval `Account Id` = CAST(`aws.cloudtrail.userIdentity.accountId` AS STRING) | sort - Count | head 10

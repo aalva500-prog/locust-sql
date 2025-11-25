@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_aws_cloudtrail__001 | parse `aws.cloudtrail.eventSource` "(?<service>s3.*)" | WHERE isnotnull(service) and `errorCode`="AccessDenied" | STATS count() as Count

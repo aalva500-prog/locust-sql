@@ -1,0 +1,1 @@
+SOURCE = flint_new_data_source_default_aws_cloudtrail__001 | STATS count() as Count by `aws.cloudtrail.awsRegion` | SORT - Count | HEAD 10
