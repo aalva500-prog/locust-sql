@@ -265,26 +265,130 @@ python3 compare_performance.py calcite.csv non_calcite.csv output.csv
 
 **Note**: Command-line mode does not include PPL queries in the output.
 
+### Test Environment Specifications
+
+The performance testing documented here was conducted on the following OpenSearch configuration:
+
+#### OpenSearch Domain Details
+
+- **OpenSearch Version**: 3.1 with latest Service Software version
+- **Data Nodes**: 6 × r7g.2xlarge.search instances
+- **Master Nodes**: 3 × m7g.large.search instances
+- **Storage Type**: EBS
+- **EBS Volume Type**: General Purpose (SSD) - gp3
+- **EBS Volume Size**: 250 GiB per node
+- **Provisioned IOPS**: 3,000 IOPS
+- **Provisioned Throughput**: 250 MiB/s
+
+#### Index Details
+
+- **Primary/Replica Shards**: 5:1
+- **Document Count**: 455,060,000 documents
+- **Total Store Size**: 119.8 GB
+- **Primary Store Size**: 59.9 GB
+
+This configuration provides a realistic testing environment for evaluating PPL query performance at scale.
+
+### Recommended Testing Approach
+
+For consistent and comparable results, we recommend the following two-phase testing approach using the Locust web interface:
+
+**Phase 1: Initial Load (15 minutes)**
+- 50 concurrent users
+- 5 users/second spawn rate
+- Duration: 15 minutes
+
+**Phase 2: Increased Load (15 minutes)**
+- 100 concurrent users  
+- 10 users/second spawn rate
+- Duration: 15 minutes
+
+This approach allows you to:
+- Establish baseline performance under moderate load
+- Observe system behavior under increased load
+- Identify performance degradation patterns
+- Compare results consistently across different configurations
+
 ### Example Workflow
+
+**Important Note about Calcite in OpenSearch 3.3+**: Calcite is **disabled by default** in OpenSearch 3.3 and later versions. You must explicitly enable it before running Calcite performance tests.
+
+#### Enabling/Disabling Calcite
+
+To enable Calcite for PPL queries, use the OpenSearch settings API:
+
+```sh
+# Enable Calcite
+curl -X PUT "https://your-opensearch-endpoint.com/_cluster/settings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "persistent": {
+      "plugins.query.executionengine.spark.calcite_enabled": true
+    }
+  }'
+```
+
+To disable Calcite (for non-Calcite testing):
+
+```sh
+# Disable Calcite
+curl -X PUT "https://your-opensearch-endpoint.com/_cluster/settings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "persistent": {
+      "plugins.query.executionengine.spark.calcite_enabled": false
+    }
+  }'
+```
 
 #### 1. Run performance test with Calcite enabled
 
+**First, enable Calcite** using the command above, then start Locust with the desired log type:
+
 ```sh
-LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m \
-  --host https://your-opensearch-endpoint.com
+LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.com
 ```
 
-Download the results CSV from Locust UI and save as `vpc_calcite.csv`
+Open http://localhost:8089 and configure the test in the web UI:
+
+**Phase 1 - Initial Load:**
+- Number of users: `50`
+- Spawn rate: `5`
+- Run time: `15m`
+- Click "Start swarming"
+
+After 15 minutes, **do not stop** the test. Instead, update the load:
+
+**Phase 2 - Increased Load:**
+- In the web UI, enter new values:
+  - Number of users: `100`
+  - Spawn rate: `10`
+- Click "Start swarming" again
+- Let it run for another 15 minutes
+
+After both phases complete (total 30 minutes), download the results CSV from Locust UI and save as `vpc_calcite.csv`
 
 #### 2. Run performance test with Calcite disabled
 
+**Disable Calcite** using the command shown above, then repeat the same process:
+
 ```sh
-# Disable Calcite on your OpenSearch cluster first
-LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m \
-  --host https://your-opensearch-endpoint.com
+LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.com
 ```
 
-Download the results CSV from Locust UI and save as `vpc_non_calcite.csv`
+In the web UI (http://localhost:8089):
+
+**Phase 1 - Initial Load (15 minutes):**
+- Number of users: `50`
+- Spawn rate: `5`
+- Run time: `15m`
+
+**Phase 2 - Increased Load (15 minutes):**
+- Number of users: `100`
+- Spawn rate: `10`
+- Continue for another 15 minutes
+
+Download the results CSV and save as `vpc_non_calcite.csv`
 
 #### 3. Compare the results
 
