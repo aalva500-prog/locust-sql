@@ -82,35 +82,19 @@ LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m --host http://loc
 
 ## Prerequisites
 
-- OpenSearch cluster with Calcite plugin enabled
+- OpenSearch cluster (version 3.3 or later recommended for best Calcite performance)
+- Calcite is available starting from OpenSearch 3.1
+  - Disabled by default in versions 3.1-3.3
+  - Will be enabled by default starting from version 3.4
 - For best results, resource-constrain OpenSearch to a handful of CPUs to observe performance characteristics
 
 ## Connecting to a Secured OpenSearch Cluster
 
-To connect to an OpenSearch cluster with authentication (like AWS OpenSearch Service), you have two options:
+To connect to an OpenSearch cluster with authentication (like AWS OpenSearch Service with Fine-Grained Access Control), use environment variables for credentials.
 
-### Option 1: Using Locust Web UI (Recommended)
+### Setting Up Authentication
 
-1. Start Locust without specifying a host:
-```sh
-LOG_TYPE=vpc uv run locust
-```
-
-2. Open http://localhost:8089 in your browser
-
-3. Enter your OpenSearch endpoint URL in the "Host" field:
-```
-https://your-opensearch-endpoint.region.es.amazonaws.com
-```
-
-4. Locust will prompt for credentials if needed, or you can modify the URL to include them:
-```
-https://username:password@your-opensearch-endpoint.region.es.amazonaws.com
-```
-
-### Option 2: Environment Variables with Modified locustfile.py
-
-Update the `locustfile.py` to support authentication from environment variables. Add this at the top of the file:
+The `locustfile.py` should be configured to read credentials from environment variables. Add this at the top of the file:
 
 ```python
 from requests.auth import HTTPBasicAuth
@@ -131,22 +115,26 @@ def on_start(self):
     # ... rest of existing code ...
 ```
 
-Run with environment variables:
+### Running Tests with Authentication
+
+Set your credentials as environment variables:
 
 ```sh
 export OPENSEARCH_USER=your-username
 export OPENSEARCH_PASSWORD='your-password'
+```
 
+Then run Locust:
+
+```sh
 LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
-Or in a single command:
+Open http://localhost:8089 in your browser to access the Locust web UI.
 
-```sh
-OPENSEARCH_USER=your-username OPENSEARCH_PASSWORD='your-password' LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.region.es.amazonaws.com
-```
+### Running Headless Tests with Authentication
 
-### Example: Running Headless Test with Authentication
+For automated/headless testing:
 
 ```sh
 # Set credentials
@@ -159,17 +147,14 @@ LOG_TYPE=vpc uv run locust --headless \
   --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
-**Note**: Make sure to modify `locustfile.py` to include the authentication code shown in Option 2 before running with environment variables.
-
-## Extracting Queries
-
-If you need to re-extract queries from the performance test JSON files:
+Or in a single command:
 
 ```sh
-python3 extract_queries.py
+OPENSEARCH_USER=your-username OPENSEARCH_PASSWORD='your-password' \
+  LOG_TYPE=vpc uv run locust --headless \
+  -u 10 -r 2 --run-time 5m \
+  --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
-
-This will read queries from `../../performance_tests/{vpc,nfw,cloudtrail,waf}/*_ppl_queries.json` and generate individual `.ppl` files in the corresponding `ppl/` subdirectories.
 
 ## Query File Format
 
@@ -182,7 +167,6 @@ SOURCE = flint_new_data_source_default_amazon_vpc_flow_v1__live_mview | STATS co
 ## Architecture
 
 - **locustfile.py** - Main Locust user class that loads and executes PPL queries
-- **extract_queries.py** - Utility script to extract queries from JSON files
 - **ppl/** - Directory containing organized PPL query files
 - **pyproject.toml** - Python dependencies managed by `uv`
 
@@ -209,13 +193,16 @@ Use these metrics to understand:
 
 ## Comparing Calcite vs Non-Calcite Performance
 
-The `compare_performance.py` script helps you compare performance test results between Calcite-enabled and non-Calcite OpenSearch configurations.
+The `compare_performance.py` script helps you compare performance test results between Calcite-enabled and non-Calcite configurations on the same OpenSearch cluster.
 
 ### Prerequisites
 
-You need two CSV files exported from Locust performance tests:
-1. Results from testing with Calcite enabled
-2. Results from testing without Calcite (or with a different configuration)
+- A single OpenSearch cluster where you can toggle the Calcite setting
+- Two CSV files exported from Locust performance tests on the same cluster:
+  1. Results from testing with Calcite enabled
+  2. Results from testing with Calcite disabled
+
+**Note**: Both tests should be run on the same cluster with identical configuration, changing only the Calcite enabled/disabled setting between tests.
 
 ### Usage
 
@@ -267,7 +254,7 @@ python3 compare_performance.py calcite.csv non_calcite.csv output.csv
 
 ### Test Environment Specifications
 
-The performance testing documented here was conducted on the following OpenSearch configuration:
+The performance testing documented here was conducted on the following Amazon OpenSearch Service domain configuration:
 
 #### OpenSearch Domain Details
 
@@ -282,12 +269,11 @@ The performance testing documented here was conducted on the following OpenSearc
 
 #### Index Details
 
-- **Primary/Replica Shards**: 5:1
-- **Document Count**: 455,060,000 documents
-- **Total Store Size**: 119.8 GB
-- **Primary Store Size**: 59.9 GB
+For meaningful performance testing results, we recommend:
+- **Minimum Index Size**: At least 100 GB per log type
+- **Shard Configuration**: Adjust primary/replica shards based on your cluster size and data volume
 
-This configuration provides a realistic testing environment for evaluating PPL query performance at scale.
+This ensures realistic testing conditions for evaluating PPL query performance at scale.
 
 ### Recommended Testing Approach
 
@@ -311,7 +297,13 @@ This approach allows you to:
 
 ### Example Workflow
 
-**Important Note about Calcite in OpenSearch 3.3+**: Calcite is **disabled by default** in OpenSearch 3.3 and later versions. You must explicitly enable it before running Calcite performance tests.
+**Important Note about Calcite in OpenSearch**: 
+- Calcite is available starting from OpenSearch 3.1
+- **Disabled by default** in versions 3.1-3.3 (must be manually enabled)
+- Will be **enabled by default** starting from version 3.4
+- Version 3.3 includes the most significant Calcite performance improvements
+
+You must explicitly enable Calcite before running Calcite performance tests on versions 3.1-3.3.
 
 #### Enabling/Disabling Calcite
 
@@ -322,8 +314,8 @@ To enable Calcite for PPL queries, use the OpenSearch settings API:
 curl -X PUT "https://your-opensearch-endpoint.com/_cluster/settings" \
   -H "Content-Type: application/json" \
   -d '{
-    "persistent": {
-      "plugins.query.executionengine.spark.calcite_enabled": true
+    "transient": {
+      "plugins.calcite.enabled": true
     }
   }'
 ```
@@ -335,8 +327,8 @@ To disable Calcite (for non-Calcite testing):
 curl -X PUT "https://your-opensearch-endpoint.com/_cluster/settings" \
   -H "Content-Type: application/json" \
   -d '{
-    "persistent": {
-      "plugins.query.executionengine.spark.calcite_enabled": false
+    "transient": {
+      "plugins.calcite.enabled": false
     }
   }'
 ```
@@ -493,27 +485,6 @@ Aggregated Results:
 3. **Allow warmup time**: Run a short warmup test before collecting results
 4. **Multiple test runs**: Run tests multiple times and compare averages
 5. **Isolate variables**: Only change one configuration (Calcite on/off) between tests
-
-Each `.ppl` file contains a single PPL query that starts with `SOURCE`. Example:
-
-```sql
-SOURCE = flint_new_data_source_default_amazon_vpc_flow_v1__live_mview | STATS count() as Count by aws.vpc.action | SORT - Count | HEAD 5
-```
-
-## Architecture
-
-- **locustfile.py** - Main Locust user class that loads and executes PPL queries
-- **extract_queries.py** - Utility script to extract queries from JSON files
-- **ppl/** - Directory containing organized PPL query files
-- **pyproject.toml** - Python dependencies managed by `uv`
-
-## Performance Testing Tips
-
-1. **Start small**: Begin with 1-5 users to establish baseline performance
-2. **Gradually increase load**: Use Locust's web UI to incrementally add users
-3. **Monitor OpenSearch**: Watch CPU, memory, and query latency in OpenSearch
-4. **Focus testing**: Use `LOG_TYPE` to isolate specific workload patterns
-5. **Resource constraints**: Consider limiting OpenSearch resources to identify bottlenecks
 
 ## Results Interpretation
 
