@@ -258,14 +258,14 @@ The performance testing documented here was conducted on the following Amazon Op
 
 #### OpenSearch Domain Details
 
-- **OpenSearch Version**: 3.1 with latest Service Software version
-- **Data Nodes**: 6 × r7g.2xlarge.search instances
-- **Master Nodes**: 3 × m7g.large.search instances
+- **OpenSearch Version**: 3.3 with latest Service Software version
+- **Data Nodes**: 6 × r7g.xlarge.search instances
+- **Master Nodes**: 3 × m7g.2xlarge.search instances
 - **Storage Type**: EBS
 - **EBS Volume Type**: General Purpose (SSD) - gp3
 - **EBS Volume Size**: 250 GiB per node
 - **Provisioned IOPS**: 3,000 IOPS
-- **Provisioned Throughput**: 250 MiB/s
+- **Provisioned Throughput**: 500 MiB/s
 
 #### Index Details
 
