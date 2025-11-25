@@ -49,7 +49,7 @@ def get_file_input(prompt, default=None):
             return Path(default)
         
         if not user_input:
-            print("  ⚠️  Please provide a file path or press Enter to use the default.")
+            print("  ⚠️  Please provide a file path.")
             continue
         
         filepath = Path(user_input)
@@ -271,17 +271,11 @@ def main():
         # Interactive mode - prompt user for inputs
         print("📋 Interactive Mode")
         print("-" * 80)
-        print("\nYou can provide file paths or press Enter to use defaults.\n")
-        
-        # Default file paths
-        default_calcite = "opensearch-utils/locust-sql/performance_results/vpc/vpc_calcite.csv"
-        default_non_calcite = "opensearch-utils/locust-sql/performance_results/vpc/vpc_non_calcite.csv"
-        default_output = "calcite_vs_non_calcite_comparison.csv"
+        print("\nPlease provide the file paths for the comparison.\n")
         
         # Get calcite file
         calcite_file = get_file_input(
-            "Enter the path to the CALCITE performance results CSV:",
-            default=default_calcite
+            "Enter the path to the CALCITE performance results CSV:"
         )
         if not calcite_file:
             print("\n❌ Aborted.")
@@ -289,22 +283,17 @@ def main():
         
         # Get non-calcite file
         non_calcite_file = get_file_input(
-            "\nEnter the path to the NON-CALCITE performance results CSV:",
-            default=default_non_calcite
+            "\nEnter the path to the NON-CALCITE performance results CSV:"
         )
         if not non_calcite_file:
             print("\n❌ Aborted.")
             return 1
         
-        # Get output file
-        output_file = get_file_input(
-            "\nEnter the path for the OUTPUT comparison CSV:",
-            default=default_output
-        )
-        if not output_file:
-            print("\n❌ Aborted.")
-            return 1
+        # Automatically generate output filename in the same directory as calcite file
+        output_dir = calcite_file.parent
+        output_file = output_dir / "calcite_vs_non_calcite_comparison.csv"
         
+        print(f"\n📝 Output will be saved to: {output_file}")
         print("\n" + "="*80)
     
     return compare_performance(calcite_file, non_calcite_file, output_file)
