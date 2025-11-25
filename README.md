@@ -100,12 +100,12 @@ LOG_TYPE=vpc uv run locust
 
 3. Enter your OpenSearch endpoint URL in the "Host" field:
 ```
-https://search-another-c6oixcocja4yha3dtq46glguvm.us-east-1.es.amazonaws.com
+https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
 4. Locust will prompt for credentials if needed, or you can modify the URL to include them:
 ```
-https://admin:h7iCC<DEb73z.}O?n1H-3w!>@search-another-c6oixcocja4yha3dtq46glguvm.us-east-1.es.amazonaws.com
+https://username:password@your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
 ### Option 2: Environment Variables with Modified locustfile.py
@@ -134,29 +134,29 @@ def on_start(self):
 Run with environment variables:
 
 ```sh
-export OPENSEARCH_USER=admin
-export OPENSEARCH_PASSWORD='h7iCC<DEb73z.}O?n1H-3w!>'
+export OPENSEARCH_USER=your-username
+export OPENSEARCH_PASSWORD='your-password'
 
-LOG_TYPE=vpc uv run locust --host https://search-another-c6oixcocja4yha3dtq46glguvm.us-east-1.es.amazonaws.com
+LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
 Or in a single command:
 
 ```sh
-OPENSEARCH_USER=admin OPENSEARCH_PASSWORD='h7iCC<DEb73z.}O?n1H-3w!>' LOG_TYPE=vpc uv run locust --host https://search-another-c6oixcocja4yha3dtq46glguvm.us-east-1.es.amazonaws.com
+OPENSEARCH_USER=your-username OPENSEARCH_PASSWORD='your-password' LOG_TYPE=vpc uv run locust --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
 ### Example: Running Headless Test with Authentication
 
 ```sh
 # Set credentials
-export OPENSEARCH_USER=admin
-export OPENSEARCH_PASSWORD='h7iCC<DEb73z.}O?n1H-3w!>'
+export OPENSEARCH_USER=your-username
+export OPENSEARCH_PASSWORD='your-password'
 
 # Run headless test
 LOG_TYPE=vpc uv run locust --headless \
   -u 10 -r 2 --run-time 5m \
-  --host https://search-another-c6oixcocja4yha3dtq46glguvm.us-east-1.es.amazonaws.com
+  --host https://your-opensearch-endpoint.region.es.amazonaws.com
 ```
 
 **Note**: Make sure to modify `locustfile.py` to include the authentication code shown in Option 2 before running with environment variables.
