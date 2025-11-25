@@ -366,7 +366,16 @@ After 15 minutes, **do not stop** the test. Instead, update the load:
 - Click "Start swarming" again
 - Let it run for another 15 minutes
 
-After both phases complete (total 30 minutes), download the results CSV from Locust UI and save as `vpc_calcite.csv`
+After both phases complete (total 30 minutes):
+
+1. In the Locust UI, click the **"Download Data"** tab
+2. Click **"Download statistics CSV"** to download the results
+3. Save the file to the appropriate performance_results directory:
+   ```
+   opensearch-utils/locust-sql/performance_results/vpc/vpc_calcite.csv
+   ```
+
+**Note**: The `performance_results/{vpc,nfw,cloudtrail,waf}/` directories contain the CSV files downloaded from Locust UI for each log type. Make sure to save your test results in the corresponding directory based on the log type you're testing.
 
 #### 2. Run performance test with Calcite disabled
 
@@ -388,7 +397,14 @@ In the web UI (http://localhost:8089):
 - Spawn rate: `10`
 - Continue for another 15 minutes
 
-Download the results CSV and save as `vpc_non_calcite.csv`
+After both phases complete (total 30 minutes):
+
+1. In the Locust UI, click the **"Download Data"** tab
+2. Click **"Download statistics CSV"** to download the results
+3. Save the file to the same performance_results directory:
+   ```
+   opensearch-utils/locust-sql/performance_results/vpc/vpc_non_calcite.csv
+   ```
 
 #### 3. Compare the results
 
