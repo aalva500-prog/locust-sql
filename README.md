@@ -207,6 +207,173 @@ Use these metrics to understand:
 - System behavior under increasing load
 - Comparative performance between log types
 
+## Comparing Calcite vs Non-Calcite Performance
+
+The `compare_performance.py` script helps you compare performance test results between Calcite-enabled and non-Calcite OpenSearch configurations.
+
+### Prerequisites
+
+You need two CSV files exported from Locust performance tests:
+1. Results from testing with Calcite enabled
+2. Results from testing without Calcite (or with a different configuration)
+
+### Usage
+
+#### Interactive Mode (Recommended)
+
+Run the script without arguments to use interactive mode:
+
+```sh
+python3 compare_performance.py
+```
+
+The script will prompt you for:
+
+1. **Path to CALCITE performance results CSV**
+   ```
+   Example: opensearch-utils/locust-sql/performance_results/vpc/vpc_calcite.csv
+   ```
+
+2. **Path to NON-CALCITE performance results CSV**
+   ```
+   Example: opensearch-utils/locust-sql/performance_results/vpc/vpc_non_calcite.csv
+   ```
+
+3. **Log type selection** (for including PPL queries in output):
+   - `vpc` - VPC Flow Logs
+   - `nfw` - Network Firewall Logs
+   - `cloudtrail` - CloudTrail Logs
+   - `waf` - WAF Logs
+   - `skip` - Skip PPL query inclusion
+
+The script will automatically:
+- Generate the output file in the same directory as the calcite input file
+- Name it `calcite_vs_non_calcite_comparison.csv`
+- Include the actual PPL query text for each test (when log type is specified)
+
+#### Command-Line Mode
+
+You can also provide file paths as command-line arguments:
+
+```sh
+# Basic usage (output file auto-generated)
+python3 compare_performance.py calcite.csv non_calcite.csv
+
+# Specify custom output file
+python3 compare_performance.py calcite.csv non_calcite.csv output.csv
+```
+
+**Note**: Command-line mode does not include PPL queries in the output.
+
+### Example Workflow
+
+#### 1. Run performance test with Calcite enabled
+
+```sh
+LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m \
+  --host https://your-opensearch-endpoint.com
+```
+
+Download the results CSV from Locust UI and save as `vpc_calcite.csv`
+
+#### 2. Run performance test with Calcite disabled
+
+```sh
+# Disable Calcite on your OpenSearch cluster first
+LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m \
+  --host https://your-opensearch-endpoint.com
+```
+
+Download the results CSV from Locust UI and save as `vpc_non_calcite.csv`
+
+#### 3. Compare the results
+
+```sh
+python3 compare_performance.py
+```
+
+When prompted:
+```
+Enter path to CALCITE CSV: performance_results/vpc/vpc_calcite.csv
+Enter path to NON-CALCITE CSV: performance_results/vpc/vpc_non_calcite.csv
+Enter log type: vpc
+```
+
+#### 4. Analyze the output
+
+The generated `calcite_vs_non_calcite_comparison.csv` will include:
+
+- **Query Name** - Name of the PPL query test
+- **PPL Query** - Full text of the PPL query (when log type specified)
+- **Better Performance** - Which configuration performed better (Calcite/Non-Calcite)
+- **Performance Improvement** - Percentage improvement
+- **Request Counts** - Total requests for each configuration
+- **Response Time Metrics** - Median, Average, Min, Max, 95th/99th percentiles
+- **Percentage Changes** - For all metrics
+- **Requests/s** - Throughput comparison
+- **Failure Counts** - Failed requests for each configuration
+
+### Comparison Output Examples
+
+#### For each log type:
+
+**VPC Flow Logs:**
+```sh
+python3 compare_performance.py
+# Select log type: vpc
+# Output: performance_results/vpc/calcite_vs_non_calcite_comparison.csv
+```
+
+**Network Firewall Logs:**
+```sh
+python3 compare_performance.py
+# Select log type: nfw
+# Output: performance_results/nfw/calcite_vs_non_calcite_comparison.csv
+```
+
+**CloudTrail Logs:**
+```sh
+python3 compare_performance.py
+# Select log type: cloudtrail
+# Output: performance_results/cloudtrail/calcite_vs_non_calcite_comparison.csv
+```
+
+**WAF Logs:**
+```sh
+python3 compare_performance.py
+# Select log type: waf
+# Output: performance_results/waf/calcite_vs_non_calcite_comparison.csv
+```
+
+### Summary Statistics
+
+The script also outputs summary statistics to the console:
+
+```
+SUMMARY STATISTICS
+
+Aggregated Results:
+  Calcite Average Response Time:     87.63 ms
+  Non-Calcite Average Response Time: 82.02 ms
+  Change: 6.84%
+
+  Calcite Median Response Time:      87 ms
+  Non-Calcite Median Response Time:  81 ms
+  Change: 7.41%
+
+  Query Performance Summary:
+    Calcite wins:     5 queries
+    Non-Calcite wins: 10 queries
+```
+
+### Tips for Accurate Comparisons
+
+1. **Use identical test parameters**: Same number of users, spawn rate, and duration
+2. **Test under similar conditions**: Similar cluster load and data volume
+3. **Allow warmup time**: Run a short warmup test before collecting results
+4. **Multiple test runs**: Run tests multiple times and compare averages
+5. **Isolate variables**: Only change one configuration (Calcite on/off) between tests
+
 Each `.ppl` file contains a single PPL query that starts with `SOURCE`. Example:
 
 ```sql

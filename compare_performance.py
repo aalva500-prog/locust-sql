@@ -66,7 +66,59 @@ def get_file_input(prompt, default=None):
         return filepath
 
 
-def compare_performance(calcite_file, non_calcite_file, output_file):
+def determine_ppl_directory(calcite_file):
+    """Determine the PPL directory based on the input file name"""
+    filename = calcite_file.name.lower()
+    
+    # Check for common patterns in filename
+    if 'vpc' in filename:
+        return 'vpc'
+    elif 'nfw' in filename or 'networkfirewall' in filename:
+        return 'nfw'
+    elif 'cloudtrail' in filename:
+        return 'cloudtrail'
+    elif 'waf' in filename:
+        return 'waf'
+    
+    # Try parent directory name
+    parent_name = calcite_file.parent.name.lower()
+    if parent_name in ['vpc', 'nfw', 'cloudtrail', 'waf']:
+        return parent_name
+    
+    return None
+
+
+def read_ppl_query(query_name, ppl_base_dir):
+    """Read PPL query content from file"""
+    if not ppl_base_dir:
+        return "N/A"
+    
+    # Extract the actual filename from the query name
+    # Query names can be like "PPL Query: vpc/01_count_all" or just "01_count_all"
+    if "PPL Query:" in query_name:
+        # Extract the part after the colon and remove any path prefix
+        parts = query_name.split(":", 1)
+        if len(parts) > 1:
+            query_name = parts[1].strip()
+    
+    # Remove any directory prefix (e.g., "vpc/" or "nfw/")
+    if "/" in query_name:
+        query_name = query_name.split("/")[-1]
+    
+    # Try to find the .ppl file
+    ppl_file = ppl_base_dir / f"{query_name}.ppl"
+    
+    if ppl_file.exists():
+        try:
+            with open(ppl_file, 'r') as f:
+                return f.read().strip()
+        except Exception:
+            return "N/A"
+    
+    return "N/A"
+
+
+def compare_performance(calcite_file, non_calcite_file, output_file, ppl_type=None):
     """Compare performance between calcite and non-calcite results"""
     
     print(f"\nReading calcite results from: {calcite_file}")
@@ -74,6 +126,29 @@ def compare_performance(calcite_file, non_calcite_file, output_file):
     
     print(f"Reading non-calcite results from: {non_calcite_file}")
     non_calcite_data = read_csv_data(non_calcite_file)
+    
+    # Find PPL directory if log type was provided
+    ppl_base_dir = None
+    
+    if ppl_type:
+        # Try to find ppl directory relative to the script or input file
+        script_dir = Path(__file__).parent
+        possible_dirs = [
+            script_dir / 'ppl' / ppl_type,
+            calcite_file.parent.parent / 'ppl' / ppl_type,
+            Path.cwd() / 'ppl' / ppl_type,
+        ]
+        
+        for dir_path in possible_dirs:
+            if dir_path.exists() and dir_path.is_dir():
+                ppl_base_dir = dir_path
+                print(f"Found PPL queries in: {ppl_base_dir}")
+                break
+        
+        if not ppl_base_dir:
+            print(f"⚠️  Warning: Could not find PPL query directory for '{ppl_type}'. Query column will show 'N/A'")
+    else:
+        print("⚠️  No log type specified. Query column will show 'N/A'")
     
     # Create a mapping of query names to data
     calcite_map = {row['Name']: row for row in calcite_data}
@@ -106,8 +181,12 @@ def compare_performance(calcite_file, non_calcite_file, output_file):
             better_performance = "Equal"
             performance_improvement = "Same performance"
         
+        # Read PPL query if available
+        ppl_query = read_ppl_query(query_name, ppl_base_dir) if query_name != 'Aggregated' else 'N/A'
+        
         comparison = {
             'Query Name': query_name,
+            'PPL Query': ppl_query,
             'Better Performance': better_performance,
             'Performance Improvement': performance_improvement,
             
@@ -289,6 +368,30 @@ def main():
             print("\n❌ Aborted.")
             return 1
         
+        # Ask for log type to find PPL queries
+        print("\n" + "-" * 80)
+        print("Log Type Selection (for PPL query inclusion)")
+        print("-" * 80)
+        print("\nAvailable log types:")
+        print("  1. vpc        - VPC Flow Logs")
+        print("  2. nfw        - Network Firewall Logs")
+        print("  3. cloudtrail - CloudTrail Logs")
+        print("  4. waf        - WAF Logs")
+        print("  5. skip       - Skip PPL query inclusion\n")
+        
+        log_type = None
+        while True:
+            user_input = input("Enter log type (vpc/nfw/cloudtrail/waf/skip): ").strip().lower()
+            
+            if user_input in ['vpc', 'nfw', 'cloudtrail', 'waf']:
+                log_type = user_input
+                break
+            elif user_input == 'skip':
+                log_type = None
+                break
+            else:
+                print("  ⚠️  Invalid log type. Please enter vpc, nfw, cloudtrail, waf, or skip.")
+        
         # Automatically generate output filename in the same directory as calcite file
         output_dir = calcite_file.parent
         output_file = output_dir / "calcite_vs_non_calcite_comparison.csv"
@@ -296,7 +399,7 @@ def main():
         print(f"\n📝 Output will be saved to: {output_file}")
         print("\n" + "="*80)
     
-    return compare_performance(calcite_file, non_calcite_file, output_file)
+    return compare_performance(calcite_file, non_calcite_file, output_file, ppl_type=log_type)
 
 
 if __name__ == "__main__":
