@@ -169,7 +169,7 @@ def main():
         return
     
     generator = TurboCloudTrailGenerator(endpoint, username, password)
-    target_docs = 10_000_000
+    target_docs = 100_000_000
     batch_size = 1500
     num_threads = 8
     
