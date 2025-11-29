@@ -79,10 +79,12 @@ def determine_ppl_directory(calcite_file):
         return 'cloudtrail'
     elif 'waf' in filename:
         return 'waf'
+    elif 'big5' in filename:
+        return 'big5'
     
     # Try parent directory name
     parent_name = calcite_file.parent.name.lower()
-    if parent_name in ['vpc', 'nfw', 'cloudtrail', 'waf']:
+    if parent_name in ['vpc', 'nfw', 'cloudtrail', 'waf', 'big5']:
         return parent_name
     
     return None
@@ -377,20 +379,21 @@ def main():
         print("  2. nfw        - Network Firewall Logs")
         print("  3. cloudtrail - CloudTrail Logs")
         print("  4. waf        - WAF Logs")
-        print("  5. skip       - Skip PPL query inclusion\n")
+        print("  5. big5       - Big5 Logs")
+        print("  6. skip       - Skip PPL query inclusion\n")
         
         log_type = None
         while True:
-            user_input = input("Enter log type (vpc/nfw/cloudtrail/waf/skip): ").strip().lower()
+            user_input = input("Enter log type (vpc/nfw/cloudtrail/waf/big5/skip): ").strip().lower()
             
-            if user_input in ['vpc', 'nfw', 'cloudtrail', 'waf']:
+            if user_input in ['vpc', 'nfw', 'cloudtrail', 'waf', 'big5']:
                 log_type = user_input
                 break
             elif user_input == 'skip':
                 log_type = None
                 break
             else:
-                print("  ⚠️  Invalid log type. Please enter vpc, nfw, cloudtrail, waf, or skip.")
+                print("  ⚠️  Invalid log type. Please enter vpc, nfw, cloudtrail, waf, big5, or skip.")
         
         # Automatically generate output filename in the same directory as calcite file
         output_dir = calcite_file.parent

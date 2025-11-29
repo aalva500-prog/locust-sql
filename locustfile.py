@@ -38,7 +38,7 @@ class OpenSearchPPLUser(HttpUser):
         
         if OpenSearchPPLUser.log_type == "all":
             # Load from all subdirectories
-            log_types = ["vpc", "nfw", "cloudtrail", "waf"]
+            log_types = ["vpc", "nfw", "cloudtrail", "waf", "big5"]
         else:
             # Load only from specified log type
             log_types = [OpenSearchPPLUser.log_type]

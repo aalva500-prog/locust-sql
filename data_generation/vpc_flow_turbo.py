@@ -14,7 +14,7 @@ from urllib3.util.retry import Retry
 class TurboVPCGenerator:
     def __init__(self, endpoint, username, password):
         self.endpoint = endpoint.rstrip('/')
-        self.auth = HTTPBasicAuth(username, password)
+        self.auth = HTTPBasicAuth(username, password) if username and password else None
         self.local = threading.local()
         
         # Pre-generate data pools for maximum speed
@@ -31,7 +31,8 @@ class TurboVPCGenerator:
     def get_session(self):
         if not hasattr(self.local, 'session'):
             self.local.session = requests.Session()
-            self.local.session.auth = self.auth
+            if self.auth:
+                self.local.session.auth = self.auth
             
             # Add retry strategy
             retry_strategy = Retry(
@@ -41,8 +42,8 @@ class TurboVPCGenerator:
             )
             
             adapter = HTTPAdapter(
-                pool_connections=20, 
-                pool_maxsize=50,
+                pool_connections=50, 
+                pool_maxsize=100,
                 max_retries=retry_strategy
             )
             self.local.session.mount('https://', adapter)
@@ -123,17 +124,36 @@ def worker(generator, index_name, batch_size, num_batches, worker_id):
     """Worker function for each thread"""
     success_count = 0
     failed_count = 0
+    consecutive_failures = 0
     
     for batch_num in range(num_batches):
         docs = [generator.generate_doc() for _ in range(batch_size)]
         
-        if generator.bulk_index(index_name, docs):
-            success_count += batch_size
-        else:
-            failed_count += 1
-            if failed_count > 10:  # Stop if too many failures
-                print(f"Worker {worker_id}: Too many failures, stopping")
+        # Retry logic with exponential backoff
+        max_retries = 3
+        success = False
+        for retry in range(max_retries):
+            if generator.bulk_index(index_name, docs):
+                success_count += batch_size
+                consecutive_failures = 0
+                success = True
                 break
+            else:
+                # Exponential backoff: 0.2s, 0.4s, 0.8s
+                backoff_time = 0.2 * (2 ** retry)
+                time.sleep(backoff_time)
+                
+                if retry == max_retries - 1:
+                    failed_count += 1
+                    consecutive_failures += 1
+        
+        # Stop if too many consecutive failures
+        if consecutive_failures > 5:
+            print(f"Worker {worker_id}: Too many consecutive failures, stopping")
+            break
+        
+        # Moderate delay between batches to balance speed and stability
+        time.sleep(0.02)
         
         # Progress update every 10 batches
         if (batch_num + 1) % 10 == 0:
@@ -148,17 +168,15 @@ def main():
     password = os.getenv('OPENSEARCH_PASSWORD')
     index_name = os.getenv('INDEX_NAME')
     
-    if not all([endpoint, username, password, index_name]):
+    if not endpoint or not index_name:
         print("Error: Missing required environment variables:")
-        print("  OPENSEARCH_ENDPOINT - OpenSearch cluster endpoint URL")
-        print("  OPENSEARCH_USER - Username for authentication")
-        print("  OPENSEARCH_PASSWORD - Password for authentication")
-        print("  INDEX_NAME - Target index name for data ingestion")
+        print("  OPENSEARCH_ENDPOINT - OpenSearch cluster endpoint URL (REQUIRED)")
+        print("  INDEX_NAME - Target index name for data ingestion (REQUIRED)")
+        print("  OPENSEARCH_USER - Username for authentication (optional)")
+        print("  OPENSEARCH_PASSWORD - Password for authentication (optional)")
         print("\nExample:")
-        print("  export OPENSEARCH_ENDPOINT=https://your-cluster.region.es.amazonaws.com")
-        print("  export OPENSEARCH_USER=admin")
-        print("  export OPENSEARCH_PASSWORD='your-password'")
-        print("  export INDEX_NAME=my_vpc_flow_logs_index")
+        print("  export OPENSEARCH_ENDPOINT=http://localhost:9200")
+        print("  export INDEX_NAME=flint_new_data_source_default_amazon_vpc_flow_v1__live_mview")
         return
     
     # Test connection first
@@ -171,9 +189,9 @@ def main():
         print("Connection test failed. Check credentials and endpoint.")
         return
     print("Connection test successful!")
-    target_docs = 100000000
-    batch_size = 2000   # Smaller batches
-    num_threads = 4     # Fewer threads
+    target_docs = 24000000
+    batch_size = 1000
+    num_threads = 4
     
     batches_per_thread = target_docs // (batch_size * num_threads)
     
@@ -203,6 +221,18 @@ def main():
     elapsed = time.time() - start_time
     final_rate = total_indexed / elapsed
     print(f"\nFinal: {total_indexed:,} docs in {elapsed:.1f}s | Rate: {final_rate:.0f} docs/sec | Failures: {total_failed}")
+    
+    # Refresh index to make data searchable
+    print(f"\nRefreshing index '{index_name}' to make data searchable...")
+    try:
+        session = generator.get_session()
+        refresh_response = session.post(f"{endpoint}/{index_name}/_refresh")
+        if refresh_response.status_code == 200:
+            print("Index refreshed successfully!")
+        else:
+            print(f"Refresh warning: HTTP {refresh_response.status_code}")
+    except Exception as e:
+        print(f"Refresh error: {str(e)}")
 
 if __name__ == "__main__":
     main()

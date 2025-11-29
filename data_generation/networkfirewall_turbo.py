@@ -15,7 +15,7 @@ from urllib3.util.retry import Retry
 class TurboNetworkFirewallGenerator:
     def __init__(self, endpoint, username, password):
         self.endpoint = endpoint.rstrip('/')
-        self.auth = HTTPBasicAuth(username, password)
+        self.auth = HTTPBasicAuth(username, password) if username and password else None
         self.local = threading.local()
         
         # Pre-generate high cardinality data pools
@@ -35,10 +35,11 @@ class TurboNetworkFirewallGenerator:
     def get_session(self):
         if not hasattr(self.local, 'session'):
             self.local.session = requests.Session()
-            self.local.session.auth = self.auth
+            if self.auth:
+                self.local.session.auth = self.auth
             
             retry_strategy = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
-            adapter = HTTPAdapter(pool_connections=20, pool_maxsize=50, max_retries=retry_strategy)
+            adapter = HTTPAdapter(pool_connections=50, pool_maxsize=100, max_retries=retry_strategy)
             self.local.session.mount('https://', adapter)
             self.local.session.mount('http://', adapter)
         return self.local.session
@@ -127,29 +128,61 @@ class TurboNetworkFirewallGenerator:
             
             result = response.json()
             if result.get('errors', False):
+                # Print first error for debugging
+                for item in result.get('items', []):
+                    if 'index' in item and 'error' in item['index']:
+                        print(f"Index error: {item['index']['error']}")
+                        break
                 return False
             
             return True
             
+        except requests.exceptions.Timeout:
+            print("Request timeout")
+            return False
+        except requests.exceptions.ConnectionError:
+            print("Connection error")
+            return False
         except Exception as e:
             print(f"Bulk error: {str(e)[:100]}")
             return False
 
 def worker(generator, index_name, batch_size, num_batches, worker_id):
+    """Worker function for each thread"""
     success_count = 0
     failed_count = 0
+    consecutive_failures = 0
     
     for batch_num in range(num_batches):
         docs = [generator.generate_doc() for _ in range(batch_size)]
         
-        if generator.bulk_index(index_name, docs):
-            success_count += batch_size
-        else:
-            failed_count += 1
-            if failed_count > 10:
-                print(f"Worker {worker_id}: Too many failures, stopping")
+        # Retry logic with exponential backoff
+        max_retries = 3
+        success = False
+        for retry in range(max_retries):
+            if generator.bulk_index(index_name, docs):
+                success_count += batch_size
+                consecutive_failures = 0
+                success = True
                 break
+            else:
+                # Exponential backoff: 0.2s, 0.4s, 0.8s
+                backoff_time = 0.2 * (2 ** retry)
+                time.sleep(backoff_time)
+                
+                if retry == max_retries - 1:
+                    failed_count += 1
+                    consecutive_failures += 1
         
+        # Stop if too many consecutive failures
+        if consecutive_failures > 5:
+            print(f"Worker {worker_id}: Too many consecutive failures, stopping")
+            break
+        
+        # Moderate delay between batches to balance speed and stability
+        time.sleep(0.02)
+        
+        # Progress update every 10 batches
         if (batch_num + 1) % 10 == 0:
             print(f"Worker {worker_id}: {batch_num + 1}/{num_batches} batches, {success_count:,} docs")
     
@@ -162,20 +195,27 @@ def main():
     password = os.getenv('OPENSEARCH_PASSWORD')
     index_name = os.getenv('INDEX_NAME')
     
-    if not all([endpoint, username, password, index_name]):
+    if not endpoint or not index_name:
         print("Error: Missing required environment variables:")
-        print("  OPENSEARCH_ENDPOINT - OpenSearch cluster endpoint URL")
-        print("  OPENSEARCH_USER - Username for authentication")
-        print("  OPENSEARCH_PASSWORD - Password for authentication")
-        print("  INDEX_NAME - Target index name for data ingestion")
+        print("  OPENSEARCH_ENDPOINT - OpenSearch cluster endpoint URL (REQUIRED)")
+        print("  INDEX_NAME - Target index name for data ingestion (REQUIRED)")
+        print("  OPENSEARCH_USER - Username for authentication (optional)")
+        print("  OPENSEARCH_PASSWORD - Password for authentication (optional)")
         print("\nExample:")
-        print("  export OPENSEARCH_ENDPOINT=https://your-cluster.region.es.amazonaws.com")
-        print("  export OPENSEARCH_USER=admin")
-        print("  export OPENSEARCH_PASSWORD='your-password'")
+        print("  export OPENSEARCH_ENDPOINT=http://localhost:9200")
         print("  export INDEX_NAME=my_networkfirewall_logs_index")
         return
     
+    # Test connection first
     generator = TurboNetworkFirewallGenerator(endpoint, username, password)
+    
+    # Test with a small batch first
+    print("Testing connection...")
+    test_docs = [generator.generate_doc() for _ in range(10)]
+    if not generator.bulk_index('test-index', test_docs):
+        print("Connection test failed. Check credentials and endpoint.")
+        return
+    print("Connection test successful!")
     target_docs = 100_000_000
     batch_size = 1500
     num_threads = 8
@@ -203,11 +243,23 @@ def main():
             elapsed = time.time() - start_time
             rate = total_indexed / elapsed if elapsed > 0 else 0
             
-            print(f"Thread {i+1} done: {indexed:,} docs | Total: {total_indexed:,} | Rate: {rate:.0f} docs/sec")
+            print(f"Thread {i+1} completed: {indexed:,} docs, {failed} failures | Total: {total_indexed:,} | Rate: {rate:.0f} docs/sec")
     
     elapsed = time.time() - start_time
     final_rate = total_indexed / elapsed
-    print(f"\nFinal: {total_indexed:,} docs in {elapsed:.1f}s | Rate: {final_rate:.0f} docs/sec")
+    print(f"\nFinal: {total_indexed:,} docs in {elapsed:.1f}s | Rate: {final_rate:.0f} docs/sec | Failures: {total_failed}")
+    
+    # Refresh index to make data searchable
+    print(f"\nRefreshing index '{index_name}' to make data searchable...")
+    try:
+        session = generator.get_session()
+        refresh_response = session.post(f"{endpoint}/{index_name}/_refresh")
+        if refresh_response.status_code == 200:
+            print("Index refreshed successfully!")
+        else:
+            print(f"Refresh warning: HTTP {refresh_response.status_code}")
+    except Exception as e:
+        print(f"Refresh error: {str(e)}")
 
 if __name__ == "__main__":
     main()

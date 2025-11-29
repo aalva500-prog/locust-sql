@@ -1,0 +1,2 @@
+source = big5 message=monkey OR message=jackal OR message=bear
+| head 10
