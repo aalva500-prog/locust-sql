@@ -84,8 +84,8 @@ LOG_TYPE=vpc uv run locust --headless -u 10 -r 2 --run-time 5m --host http://loc
 
 - OpenSearch cluster (version 3.3 or later recommended for best Calcite performance)
 - Calcite is available starting from OpenSearch 3.1
-  - Disabled by default in versions 3.1-3.3
-  - Will be enabled by default starting from version 3.4
+  - Disabled by default in versions 3.1
+  - Will be enabled by default starting from version 3.3
 - For best results, resource-constrain OpenSearch to a handful of CPUs to observe performance characteristics
 
 ## Generating Test Data
