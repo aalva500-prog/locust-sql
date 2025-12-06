@@ -1,0 +1,10 @@
+{
+  "size": 10,
+  "track_total_hits": false,
+  "query": {
+    "match": {
+      "process.name": "kernel"
+    }
+  },
+  "sort": [{"@timestamp": "asc"}]
+}

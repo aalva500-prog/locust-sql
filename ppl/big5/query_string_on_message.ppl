@@ -1,2 +1,2 @@
-source = big5 message=monkey OR message=jackal OR message=bear
+source = big5 query_string(['message'], 'shield AND carp AND shark')
 | head 10

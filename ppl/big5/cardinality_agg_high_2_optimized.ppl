@@ -1,2 +1,0 @@
-source = big5
-| stats bucket_nullable = false dc(`event.id`)
