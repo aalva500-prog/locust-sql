@@ -13,7 +13,22 @@ def read_csv_data(filepath):
     """Read CSV file and return data as list of dictionaries"""
     data = []
     with open(filepath, 'r') as f:
-        reader = csv.DictReader(f)
+        # Read all lines
+        lines = f.readlines()
+        
+        # Skip the first line if it doesn't look like a CSV header
+        # (i.e., if it doesn't contain commas or doesn't start with expected headers)
+        start_index = 0
+        if lines and ',' not in lines[0]:
+            start_index = 1
+        elif lines and not any(header in lines[0] for header in ['Type', 'Name', 'Request Count']):
+            start_index = 1
+        
+        # Create CSV reader from remaining lines
+        from io import StringIO
+        csv_content = ''.join(lines[start_index:])
+        reader = csv.DictReader(StringIO(csv_content))
+        
         for row in reader:
             data.append(row)
     return data
